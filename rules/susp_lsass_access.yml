@@ -1,0 +1,34 @@
+title: Suspicious LSASS Process Access (Credential Dumping)
+id: d4e5f6a7-b8c9-0123-def4-567890123456
+status: experimental
+description: Detects suspicious access to the LSASS process, which may indicate credential dumping attempts using tools like Mimikatz or similar.
+author: CyberBrother
+date: 2026-03-19
+logsource:
+    category: process_access
+    product: windows
+detection:
+    selection:
+        TargetImage|endswith: '\lsass.exe'
+        GrantedAccess|contains:
+            - '0x1010'
+            - '0x1038'
+            - '0x1410'
+            - '0x1438'
+            - '0x143a'
+    filter_system:
+        SourceImage|endswith:
+            - '\wmiprvse.exe'
+            - '\taskmgr.exe'
+            - '\procexp64.exe'
+            - '\MsMpEng.exe'
+            - '\csrss.exe'
+            - '\lsm.exe'
+    condition: selection and not filter_system
+falsepositives:
+    - Security products that access LSASS for monitoring
+    - Windows Error Reporting
+level: critical
+tags:
+    - attack.credential_access
+    - attack.t1003.001

@@ -1,0 +1,19 @@
+title: Suspicious Execution of whoami
+id: eaa38a53-333e-463e-8cfa-4e7855b768a3
+status: experimental
+description: Detects the execution of the whoami command, which is often used by attackers for situational awareness.
+author: CyberBrother
+date: 2026-03-19
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        Image|endswith: '\whoami.exe'
+    condition: selection
+falsepositives:
+    - System administrators or automated scripts.
+level: low
+tags:
+    - attack.discovery
+    - attack.t1033

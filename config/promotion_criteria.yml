@@ -1,0 +1,76 @@
+# ============================================================
+# Rule Promotion Criteria
+# ============================================================
+# Defines thresholds a rule must meet in DEV environment
+# before being auto-promoted to PRODUCTION.
+#
+# Lifecycle: draft → dev → staging → production
+# ============================================================
+
+promotion_stages:
+
+  # --- Draft → Dev ---
+  draft_to_dev:
+    requirements:
+      - validation_pass: true          # Must pass YAML/schema validation
+      - required_fields_present: true  # All Sigma required fields exist
+      - mitre_tags_present: true       # Must have attack.* tags
+    auto_promote: true                 # Auto-promote when criteria met
+
+  # --- Dev → Staging ---
+  dev_to_staging:
+    requirements:
+      - validation_pass: true
+      - atomic_test_mapped: true       # Must have ART test mapping
+      - detection_score_min: 80        # Minimum detection score (%)
+      - false_positive_rate_max: 15    # Max false positive rate (%)
+      - test_runs_min: 3              # Minimum test executions
+    auto_promote: true
+    review_required: false
+
+  # --- Staging → Production ---
+  staging_to_production:
+    requirements:
+      - validation_pass: true
+      - detection_score_min: 85        # Higher threshold for prod
+      - false_positive_rate_max: 10    # Lower FP threshold for prod
+      - test_runs_min: 5              # More test runs required
+      - soak_period_hours: 24          # Must run in staging for 24h
+      - no_regressions: true           # Must not break existing rules
+    auto_promote: true
+    review_required: true              # Needs human approval for prod
+
+# ============================================================
+# Scoring weights for detection effectiveness
+# ============================================================
+scoring:
+  # How detection score is calculated
+  weights:
+    true_positive_rate: 0.40      # Weight for correctly detected attacks
+    false_positive_rate: 0.30     # Weight for avoiding false alarms (inverted)
+    coverage_breadth: 0.15        # Weight for covering multiple test variants
+    query_efficiency: 0.15        # Weight for query performance
+
+  # Grade mapping
+  grades:
+    A: 90   # Excellent — ready for production
+    B: 80   # Good — ready for staging
+    C: 70   # Acceptable — needs improvement
+    D: 60   # Poor — rework needed
+    F: 0    # Failing — block deployment
+
+# ============================================================
+# Alert fatigue prevention
+# ============================================================
+alert_tuning:
+  # Rules generating more than this many alerts/hour get flagged
+  max_alerts_per_hour: 50
+  # Rules with FP rate above this get auto-disabled in prod
+  auto_disable_fp_threshold: 25
+  # Suppression window for duplicate alerts
+  dedup_window_minutes: 60
+  # Fields to aggregate alerts on
+  aggregation_fields:
+    - "ComputerName"
+    - "User"
+    - "ParentImage"

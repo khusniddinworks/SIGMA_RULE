@@ -1,0 +1,82 @@
+# ============================================================
+# Multi-SIEM Configuration for Sigma Rule Orchestrator
+# ============================================================
+# All sensitive values (API keys, tokens, passwords) MUST be
+# stored in GitHub Secrets — NEVER hardcode credentials here.
+# ============================================================
+
+siem_platforms:
+
+  splunk:
+    enabled: true
+    # Base URL of Splunk instance (set via SPLUNK_URL secret)
+    base_url: "${SPLUNK_URL}"
+    # HEC (HTTP Event Collector) or REST API
+    api_endpoint: "/servicesNS/admin/search/saved/searches"
+    auth_type: "token"  # Options: token, basic
+    # Token stored in SPLUNK_API_TOKEN secret
+    verify_ssl: true
+    # Splunk-specific conversion settings
+    conversion:
+      backend: "splunk"
+      pipeline: "splunk_windows"
+      output_format: "savedsearches"
+    # Alert settings to reduce noise
+    alert_config:
+      suppress_period: "1h"
+      max_alerts_per_hour: 10
+      aggregate_by:
+        - "ComputerName"
+        - "User"
+
+  elasticsearch:
+    enabled: true
+    # Base URL of Elasticsearch/Kibana (set via ELASTIC_URL secret)
+    base_url: "${ELASTIC_URL}"
+    api_endpoint: "/_security/api/detection_engine/rules"
+    auth_type: "api_key"  # Options: api_key, basic
+    # API key stored in ELASTIC_API_KEY secret
+    verify_ssl: true
+    # Elasticsearch-specific conversion settings
+    conversion:
+      backend: "elasticsearch"
+      pipeline: "ecs_windows"
+      output_format: "lucene"
+    # Alert settings to reduce noise
+    alert_config:
+      throttle_period: "1h"
+      max_signals: 100
+      risk_score_mapping:
+        critical: 99
+        high: 73
+        medium: 47
+        low: 21
+        informational: 5
+
+# ============================================================
+# Rule tuning — global filters to reduce false positives
+# ============================================================
+global_filters:
+  excluded_users:
+    - "SYSTEM"
+    - "LOCAL SERVICE"
+    - "NETWORK SERVICE"
+  excluded_paths:
+    - "C:\\Windows\\System32\\svchost.exe"
+    - "C:\\Windows\\System32\\services.exe"
+    - "C:\\Program Files\\*\\updater.exe"
+  # Minimum severity level to deploy (skip informational)
+  min_deploy_level: "low"
+
+# ============================================================
+# Notification settings
+# ============================================================
+notifications:
+  slack:
+    enabled: false
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+  email:
+    enabled: false
+    smtp_server: "${SMTP_SERVER}"
+    recipients:
+      - "soc-team@example.com"

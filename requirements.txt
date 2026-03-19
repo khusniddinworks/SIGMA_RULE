@@ -1,0 +1,8 @@
+sigma-cli
+pysigma-backend-splunk
+pysigma-backend-elasticsearch
+pysigma-pipeline-windows
+requests
+PyYAML
+jsonschema
+colorama

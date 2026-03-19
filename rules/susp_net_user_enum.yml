@@ -1,0 +1,28 @@
+title: Suspicious User Account Discovery
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: experimental
+description: Detects the use of net.exe or net1.exe to enumerate user accounts or groups, a common reconnaissance technique used by attackers.
+author: CyberBrother
+date: 2026-03-19
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_img:
+        Image|endswith:
+            - '\net.exe'
+            - '\net1.exe'
+    selection_cli:
+        CommandLine|contains:
+            - ' user'
+            - ' localgroup'
+            - ' group'
+            - ' accounts'
+    condition: selection_img and selection_cli
+falsepositives:
+    - Legitimate administration and troubleshooting
+level: medium
+tags:
+    - attack.discovery
+    - attack.t1087.001
+    - attack.t1087.002

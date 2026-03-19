@@ -1,0 +1,35 @@
+title: Suspicious Remote File Download via Command Line
+id: c3d4e5f6-a7b8-9012-cdef-345678901234
+status: experimental
+description: Detects usage of common Windows utilities to download files from remote servers, a technique frequently used in initial access and payload delivery.
+author: CyberBrother
+date: 2026-03-19
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_certutil:
+        Image|endswith: '\certutil.exe'
+        CommandLine|contains:
+            - 'urlcache'
+            - '-split'
+    selection_bitsadmin:
+        Image|endswith: '\bitsadmin.exe'
+        CommandLine|contains:
+            - '/transfer'
+            - '/download'
+    selection_curl:
+        Image|endswith: '\curl.exe'
+        CommandLine|contains:
+            - 'http://'
+            - 'https://'
+    selection_wget:
+        Image|endswith: '\wget.exe'
+    condition: selection_certutil or selection_bitsadmin or selection_curl or selection_wget
+falsepositives:
+    - Legitimate file downloads by administrators
+    - Software update mechanisms
+level: high
+tags:
+    - attack.command_and_control
+    - attack.t1105

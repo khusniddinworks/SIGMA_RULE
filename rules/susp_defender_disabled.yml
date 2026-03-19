@@ -1,0 +1,39 @@
+title: Windows Defender Real-Time Protection Disabled
+id: f6a7b8c9-d0e1-2345-f678-901234567890
+status: experimental
+description: Detects attempts to disable Windows Defender real-time protection or tamper with security settings, a common defense evasion technique.
+author: CyberBrother
+date: 2026-03-19
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_powershell:
+        Image|endswith:
+            - '\powershell.exe'
+            - '\pwsh.exe'
+        CommandLine|contains:
+            - 'Set-MpPreference'
+            - 'DisableRealtimeMonitoring'
+            - 'DisableBehaviorMonitoring'
+            - 'DisableBlockAtFirstSeen'
+            - 'DisableIOAVProtection'
+            - 'DisableScriptScanning'
+    selection_reg:
+        Image|endswith: '\reg.exe'
+        CommandLine|contains|all:
+            - 'Windows Defender'
+            - 'DisableAntiSpyware'
+    selection_sc:
+        Image|endswith: '\sc.exe'
+        CommandLine|contains|all:
+            - 'WinDefend'
+            - 'stop'
+    condition: selection_powershell or selection_reg or selection_sc
+falsepositives:
+    - System administrators disabling Defender for software installation
+    - Group Policy updates
+level: high
+tags:
+    - attack.defense_evasion
+    - attack.t1562.001

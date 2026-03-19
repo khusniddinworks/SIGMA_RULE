@@ -1,0 +1,338 @@
+# =============================================================
+# End-to-End Detection Development Pipeline
+# =============================================================
+# Full lifecycle: Validate → Test → Score → Promote → Deploy
+#
+# Environments: draft → dev → staging → production
+# Testing: Atomic Red Team simulation against each rule
+# Promotion: Threshold-based, automated with approval gates
+#
+# OPSEC:
+#   - All credentials in GitHub Secrets (never hardcoded)
+#   - Test runs in safe_mode (no actual attack commands)
+#   - SSL verification enabled
+#   - Minimal permissions (read-only content, write artifacts)
+# =============================================================
+
+name: "🔬 Detection Development Pipeline"
+
+on:
+  push:
+    paths:
+      - "rules/**"
+      - "config/**"
+    branches:
+      - main
+      - develop
+  pull_request:
+    paths:
+      - "rules/**"
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      force_promote:
+        description: "Force promotion (skip thresholds)"
+        required: false
+        default: "false"
+        type: boolean
+      run_live_tests:
+        description: "Run LIVE tests (requires isolated env)"
+        required: false
+        default: "false"
+        type: boolean
+
+concurrency:
+  group: detection-pipeline-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+env:
+  PYTHON_VERSION: "3.11"
+  RULES_DIR: "rules"
+  OUTPUT_DIR: "output"
+  CONFIG_DIR: "config"
+
+jobs:
+  # =========================================================
+  # Stage 1: Validate & Lint
+  # =========================================================
+  validate:
+    name: "🔍 Stage 1 — Validate Rules"
+    runs-on: ubuntu-latest
+    outputs:
+      deployable_count: ${{ steps.validate.outputs.deployable_count }}
+      total_rules: ${{ steps.validate.outputs.total_rules }}
+      has_errors: ${{ steps.validate.outputs.validation_errors != '0' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: "📦 Install dependencies"
+        run: pip install -r requirements.txt
+
+      - name: "🔍 Validate Sigma rules"
+        id: validate
+        run: python scripts/validate_rules.py ${{ env.RULES_DIR }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-results
+          path: |
+            deployable_rules.json
+          retention-days: 30
+
+  # =========================================================
+  # Stage 2: Automated Testing (Atomic Red Team)
+  # =========================================================
+  test:
+    name: "🧪 Stage 2 — Detection Testing"
+    runs-on: ubuntu-latest
+    needs: validate
+    if: needs.validate.outputs.has_errors == 'false'
+    outputs:
+      tested_rules: ${{ steps.test.outputs.tested_rules }}
+      eligible_rules: ${{ steps.test.outputs.eligible_rules }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: "📦 Install dependencies"
+        run: pip install -r requirements.txt
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: validation-results
+          path: .
+
+      - name: "🧪 Run detection tests (Atomic Red Team simulation)"
+        id: test
+        run: |
+          python scripts/test_rules.py \
+            ${{ env.RULES_DIR }} \
+            ${{ env.CONFIG_DIR }}/atomic_tests.yml \
+            ${{ env.CONFIG_DIR }}/promotion_criteria.yml \
+            ${{ env.OUTPUT_DIR }}
+
+      - name: "📊 Upload test results"
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            ${{ env.OUTPUT_DIR }}/test_report.json
+            ${{ env.OUTPUT_DIR }}/test_summary.md
+          retention-days: 30
+
+      - name: "📝 Post test summary to PR"
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summaryPath = '${{ env.OUTPUT_DIR }}/test_summary.md';
+            if (fs.existsSync(summaryPath)) {
+              const summary = fs.readFileSync(summaryPath, 'utf8');
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: summary
+              });
+            }
+
+  # =========================================================
+  # Stage 3: Rule Promotion (Dev → Staging → Prod)
+  # =========================================================
+  promote:
+    name: "🎯 Stage 3 — Promote Rules"
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name != 'pull_request'
+    outputs:
+      promoted_count: ${{ steps.promote.outputs.promoted_count }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: "📦 Install dependencies"
+        run: pip install -r requirements.txt
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: test-results
+          path: ${{ env.OUTPUT_DIR }}
+
+      - name: "🎯 Evaluate and promote rules"
+        id: promote
+        run: |
+          python scripts/promote_rules.py \
+            ${{ env.OUTPUT_DIR }}/test_report.json \
+            ${{ env.CONFIG_DIR }}/promotion_criteria.yml \
+            ${{ env.OUTPUT_DIR }}
+
+      - name: "📊 Upload promotion results"
+        uses: actions/upload-artifact@v4
+        with:
+          name: promotion-results
+          path: |
+            ${{ env.OUTPUT_DIR }}/promotion_report.json
+            ${{ env.CONFIG_DIR }}/rule_states.json
+            environments/
+          retention-days: 30
+
+  # =========================================================
+  # Stage 4: Convert to SIEM formats
+  # =========================================================
+  convert:
+    name: "🔄 Stage 4 — Convert Rules"
+    runs-on: ubuntu-latest
+    needs: promote
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: "📦 Install dependencies"
+        run: pip install -r requirements.txt
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: validation-results
+          path: .
+
+      - name: "🔄 Convert to Splunk & Elasticsearch"
+        run: |
+          python scripts/convert_rules.py \
+            ${{ env.RULES_DIR }} \
+            ${{ env.OUTPUT_DIR }} \
+            ${{ env.CONFIG_DIR }}/siem_config.yml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: converted-rules
+          path: ${{ env.OUTPUT_DIR }}/
+          retention-days: 30
+
+  # =========================================================
+  # Stage 5a: Deploy to Splunk (Production only)
+  # =========================================================
+  deploy-splunk:
+    name: "🔷 Stage 5a — Deploy Splunk"
+    runs-on: ubuntu-latest
+    needs: convert
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - run: pip install -r requirements.txt
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: converted-rules
+          path: ${{ env.OUTPUT_DIR }}
+
+      - name: "🔷 Deploy to Splunk"
+        env:
+          SPLUNK_URL: ${{ secrets.SPLUNK_URL }}
+          SPLUNK_API_TOKEN: ${{ secrets.SPLUNK_API_TOKEN }}
+        run: python scripts/deploy_siem.py ${{ env.OUTPUT_DIR }}
+
+  # =========================================================
+  # Stage 5b: Deploy to Elasticsearch (Production only)
+  # =========================================================
+  deploy-elasticsearch:
+    name: "🟡 Stage 5b — Deploy Elasticsearch"
+    runs-on: ubuntu-latest
+    needs: convert
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - run: pip install -r requirements.txt
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: converted-rules
+          path: ${{ env.OUTPUT_DIR }}
+
+      - name: "🟡 Deploy to Elasticsearch"
+        env:
+          ELASTIC_URL: ${{ secrets.ELASTIC_URL }}
+          ELASTIC_API_KEY: ${{ secrets.ELASTIC_API_KEY }}
+        run: python scripts/deploy_siem.py ${{ env.OUTPUT_DIR }}
+
+  # =========================================================
+  # Stage 6: Final Report
+  # =========================================================
+  report:
+    name: "📊 Stage 6 — Pipeline Report"
+    runs-on: ubuntu-latest
+    needs: [validate, test, promote, convert]
+    if: always()
+
+    steps:
+      - name: "📊 Generate pipeline summary"
+        run: |
+          echo "## 🔬 Detection Development Pipeline Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔍 Validate | ${{ needs.validate.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🧪 Test | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🎯 Promote | ${{ needs.promote.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔄 Convert | ${{ needs.convert.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Rules:** ${{ needs.validate.outputs.total_rules }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tested:** ${{ needs.test.outputs.tested_rules }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Promoted:** ${{ needs.promote.outputs.promoted_count }}" >> $GITHUB_STEP_SUMMARY
