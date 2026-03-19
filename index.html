@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberBrother | Sigma Rule Orchestrator Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-dark: #0a0b10;
+            --card-bg: #12141c;
+            --primary: #00f2ff;
+            --secondary: #7000ff;
+            --accent: #ff00c8;
+            --success: #00ff88;
+            --warning: #ffcc00;
+            --danger: #ff4d4d;
+            --text-main: #e0e6ed;
+            --text-dim: #94a3b8;
+            --border: #1e293b;
+            --font-main: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        .cyber-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(to right, rgba(0, 242, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0, 242, 255, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .glow-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 50%, rgba(112, 0, 255, 0.1) 0%, transparent 80%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        header {
+            padding: 2rem 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(10, 11, 16, 0.8);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--primary);
+            text-transform: uppercase;
+        }
+
+        .logo i {
+            color: var(--primary);
+            filter: drop-shadow(0 0 8px var(--primary));
+        }
+
+        .status-badge {
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--success);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border: 1px solid var(--success);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse-animation 2s infinite;
+        }
+
+        @keyframes pulse-animation {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+        }
+
+        main {
+            padding: 2rem 5%;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            border-radius: 16px;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+        }
+
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--primary);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+            font-family: var(--font-mono);
+        }
+
+        .stat-sub {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-top: 0.5rem;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section-header {
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .section-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            height: 100%;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th {
+            padding: 1rem;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 1.2rem 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        .rule-name {
+            font-weight: 600;
+            color: var(--primary);
+            font-family: var(--font-mono);
+        }
+
+        .badge {
+            padding: 0.3rem 0.8rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            display: inline-block;
+        }
+
+        .badge-a { background: rgba(0, 255, 136, 0.1); color: var(--success); border: 1px solid var(--success); }
+        .badge-f { background: rgba(255, 77, 77, 0.1); color: var(--danger); border: 1px solid var(--danger); }
+        .badge-stage { background: rgba(112, 0, 255, 0.1); color: var(--secondary); border: 1px solid var(--secondary); }
+
+        .score-bar {
+            width: 100px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 0.5rem;
+        }
+
+        .score-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--secondary), var(--primary));
+        }
+
+        .pipeline-viz {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .pipeline-step {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            position: relative;
+        }
+
+        .pipeline-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 40px;
+            width: 2px;
+            height: calc(100% - 20px);
+            background: var(--border);
+        }
+
+        .step-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--border);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            z-index: 1;
+            transition: all 0.3s ease;
+        }
+
+        .step-active .step-icon {
+            background: var(--primary);
+            color: var(--bg-dark);
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        .step-info h4 {
+            font-size: 1rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .step-info p {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+        }
+
+        .mitre-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+
+        .mitre-cell {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            padding: 1rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+        }
+
+        .mitre-id {
+            color: var(--primary);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .mitre-name {
+            font-weight: 600;
+        }
+
+        .expand-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .expand-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            display: none;
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 2.5rem;
+            position: relative;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            cursor: pointer;
+            color: var(--text-dim);
+        }
+
+        .test-result-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            padding: 1.2rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+        }
+
+        .test-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.8rem;
+        }
+
+        .test-status {
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .status-ok { color: var(--success); }
+        .status-fail { color: var(--danger); }
+
+        .test-details {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.8rem;
+            border-radius: 6px;
+            margin-top: 0.5rem;
+            word-break: break-all;
+        }
+
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+
+        footer {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-dim);
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+
+        .cyber-btn {
+            background: var(--primary);
+            color: var(--bg-dark);
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
+        }
+
+        .cyber-btn:hover {
+            box-shadow: 0 0 30px rgba(0, 242, 255, 0.4);
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="cyber-grid"></div>
+    <div class="glow-overlay"></div>
+
+    <header>
+        <div class="logo">
+            <i data-lucide="shield-check"></i>
+            <span>CyberBrother</span>
+        </div>
+        <div class="status-badge">
+            <div class="pulse"></div>
+            Tizim Faol
+        </div>
+    </header>
+
+    <main>
+        <div class="section-header">
+            <i data-lucide="bar-chart-3" style="color: var(--primary)"></i>
+            <h2>Tizim Ko'rsatkichlari</h2>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <span>Jami Qoidalar</span>
+                    <i data-lucide="file-code"></i>
+                </div>
+                <div class="stat-value" id="total-rules">0</div>
+                <div class="stat-sub">Validatatsiyadan o'tgan</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <span>O'rtacha Score</span>
+                    <i data-lucide="gauge"></i>
+                </div>
+                <div class="stat-value" id="avg-score">0%</div>
+                <div class="stat-sub">Aniqlash samaradorligi</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header" style="color: var(--success)">
+                    <span style="color: var(--success)">Muvaffaqiyat</span>
+                    <i data-lucide="check-circle-2"></i>
+                </div>
+                <div class="stat-value" id="success-rate">0%</div>
+                <div class="stat-sub">Atomic testlar natijasi</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <span>Hozirgi Bosqich</span>
+                    <i data-lucide="git-branch"></i>
+                </div>
+                <div class="stat-value" style="font-size: 1.8rem; padding-top: 0.8rem;">DEVELOPMENT</div>
+                <div class="stat-sub">Draft → Dev produtsess</div>
+            </div>
+        </div>
+
+        <div class="content-grid">
+            <!-- Rules Table -->
+            <div class="card">
+                <div class="section-header">
+                    <i data-lucide="list" style="color: var(--primary)"></i>
+                    <h2>Sigma Qoidalari Ro'yxati</h2>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Qoida Nomi</th>
+                                <th>MITRE ID</th>
+                                <th>Grade</th>
+                                <th>Score</th>
+                                <th>Bosqich</th>
+                                <th>Amallar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rules-body">
+                            <!-- JS injects here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Pipeline Visualizer -->
+            <div class="card">
+                <div class="section-header">
+                    <i data-lucide="workflow" style="color: var(--secondary)"></i>
+                    <h2>Pipeline Jarayoni</h2>
+                </div>
+                <div class="pipeline-viz">
+                    <div class="pipeline-step step-active">
+                        <div class="step-icon"><i data-lucide="shield"></i></div>
+                        <div class="step-info">
+                            <h4>Validatsiya</h4>
+                            <p>Sintaksis va schema tekshiruvi yakunlandi</p>
+                        </div>
+                    </div>
+                    <div class="pipeline-step step-active">
+                        <div class="step-icon"><i data-lucide="flask-conical"></i></div>
+                        <div class="step-info">
+                            <h4>Testlash (Simulation)</h4>
+                            <p>Atomic Red Team testlari o'tkazildi</p>
+                        </div>
+                    </div>
+                    <div class="pipeline-step step-active">
+                        <div class="step-icon"><i data-lucide="target"></i></div>
+                        <div class="step-info">
+                            <h4>Promotion</h4>
+                            <p>Qoidalar DEV muhitiga ko'chirildi</p>
+                        </div>
+                    </div>
+                    <div class="pipeline-step">
+                        <div class="step-icon"><i data-lucide="repeat"></i></div>
+                        <div class="step-info">
+                            <h4>Conversion</h4>
+                            <p>SIEM formatlariga o'tkazish kutilmoqda</p>
+                        </div>
+                    </div>
+                    <div class="pipeline-step">
+                        <div class="step-icon"><i data-lucide="upload-cloud"></i></div>
+                        <div class="step-info">
+                            <h4>Deployment</h4>
+                            <p>Splunk/Elasticsearch-ga yuklash</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-header" style="margin-top: 3rem;">
+                    <i data-lucide="pie-chart" style="color: var(--accent)"></i>
+                    <h2>Statistika</h2>
+                </div>
+                <div class="chart-container">
+                    <canvas id="gradeChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- MITRE Section -->
+        <div class="card" style="margin-bottom: 2.5rem;">
+            <div class="section-header">
+                <i data-lucide="grid" style="color: var(--primary)"></i>
+                <h2>MITRE ATT&CK® Coverage (Windows)</h2>
+            </div>
+            <div class="mitre-grid" id="mitre-grid">
+                <!-- JS injects here -->
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 CyberBrother Project | SIGMA Rule Orchestrator</p>
+        <p style="font-size: 0.8rem; margin-top: 0.5rem; opacity: 0.5;">Faqat tahliliy maqsadlar uchun yaratilgan</p>
+    </footer>
+
+    <!-- Modal for Test Details -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal">
+            <i data-lucide="x" class="close-modal" id="close-modal"></i>
+            <h2 id="modal-title" style="margin-bottom: 0.5rem; color: var(--primary);"></h2>
+            <p id="modal-desc" style="color: var(--text-dim); margin-bottom: 2rem;"></p>
+            
+            <div id="test-results-container">
+                <!-- JS injects test results here -->
+            </div>
+            
+            <div style="margin-top: 2rem; display: flex; justify-content: flex-end;">
+                <button class="cyber-btn" onclick="closeModal()">Yopish</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA INJECTION ---
+        // EMBEDDED FROM JSON FILES
+        const testReport = {
+  "susp_cmd_whoami": {
+    "rule_name": "susp_cmd_whoami",
+    "rule_file": "rules/susp_cmd_whoami.yml",
+    "mitre_technique": "T1033",
+    "total_tests": 1,
+    "true_positives": 1,
+    "true_negatives": 0,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "detection_score": 100.0,
+    "grade": "A",
+    "promotion_eligible": true,
+    "test_results": [
+      {
+        "test_id": "T1033-1",
+        "test_name": "System Owner/User Discovery",
+        "expected": true,
+        "detected": true,
+        "correct": true,
+        "match_details": "Selections: {'selection': True} | Condition: 'selection' → True"
+      }
+    ]
+  },
+  "susp_powershell_execution": {
+    "rule_name": "susp_powershell_execution",
+    "rule_file": "rules/susp_powershell_execution.yml",
+    "mitre_technique": "T1059.001",
+    "total_tests": 3,
+    "true_positives": 2,
+    "true_negatives": 1,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "detection_score": 100.0,
+    "grade": "A",
+    "promotion_eligible": true,
+    "test_results": [
+      {
+        "test_id": "T1059.001-1",
+        "test_name": "Mimikatz via PowerShell",
+        "expected": true,
+        "detected": true,
+        "correct": true,
+        "match_details": "Selections: {'selection_img': True, 'selection_cli': True} | Condition: 'selection_img and selection_cli' → True"
+      },
+      {
+        "test_id": "T1059.001-7",
+        "test_name": "PowerShell Download Cradle",
+        "expected": true,
+        "detected": true,
+        "correct": true,
+        "match_details": "Selections: {'selection_img': True, 'selection_cli': True} | Condition: 'selection_img and selection_cli' → True"
+      },
+      {
+        "test_id": "T1059.001-BENIGN",
+        "test_name": "Benign PowerShell (should NOT trigger)",
+        "expected": false,
+        "detected": false,
+        "correct": true,
+        "match_details": "Selections: {'selection_img': True, 'selection_cli': False} | Condition: 'selection_img and selection_cli' → False"
+      }
+    ]
+  },
+  "susp_net_user_enum": {
+    "rule_name": "susp_net_user_enum",
+    "rule_file": "rules/susp_net_user_enum.yml",
+    "mitre_technique": "T1087.001",
+    "total_tests": 3,
+    "true_positives": 2,
+    "true_negatives": 1,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "detection_score": 100.0,
+    "grade": "A",
+    "promotion_eligible": true,
+    "test_results": [
+      {
+        "test_id": "T1087.001-1",
+        "test_name": "Enumerate Local Users",
+        "expected": true,
+        "detected": true,
+        "correct": true,
+        "match_details": "Selections: {'selection_img': True, 'selection_cli': True} | Condition: 'selection_img and selection_cli' → True"
+      },
+      {
+        "test_id": "T1087.001-2",
+        "test_name": "Enumerate Local Groups",
+        "expected": true,
+        "detected": true,
+        "correct": true,
+        "match_details": "Selections: {'selection_img': True, 'selection_cli': True} | Condition: 'selection_img and selection_cli' → True"
+      },
+      {
+        "test_id": "T1087.001-BENIGN",
+        "test_name": "Net statistics (should NOT trigger)",
+        "expected": false,
+        "detected": false,
+        "correct": true,
+        "match_details": "Selections: {'selection_img': True, 'selection_cli': False} | Condition: 'selection_img and selection_cli' → False"
+      }
+    ]
+  },
+  "susp_registry_persistence": {
+    "rule_name": "susp_registry_persistence",
+    "rule_file": "rules/susp_registry_persistence.yml",
+    "mitre_technique": "T1547.001",
+    "total_tests": 1,
+    "true_positives": 0,
+    "true_negatives": 0,
+    "false_positives": 0,
+    "false_negatives": 1,
+    "detection_score": 45.0,
+    "grade": "F",
+    "promotion_eligible": false,
+    "test_results": [
+      {
+        "test_id": "T1547.001-1",
+        "test_name": "Add Registry Run Key",
+        "expected": true,
+        "detected": false,
+        "correct": false,
+        "match_details": "Selections: {'selection': False, 'filter_trusted': False} | Condition: 'selection and not filter_trusted' → False"
+      }
+    ]
+  },
+  "susp_remote_file_download": {
+    "rule_name": "susp_remote_file_download",
+    "rule_file": "rules/susp_remote_file_download.yml",
+    "mitre_technique": "T1105",
+    "total_tests": 2,
+    "true_positives": 2,
+    "true_negatives": 0,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "detection_score": 100.0,
+    "grade": "A",
+    "promotion_eligible": true,
+    "test_results": [
+      {
+        "test_id": "T1105-1",
+        "test_name": "Certutil Download",
+        "expected": true,
+        "detected": true,
+        "correct": true,
+        "match_details": "Selections: {'selection_certutil': True, 'selection_bitsadmin': False, 'selection_curl': False, 'selection_wget': False} | Condition: 'selection_certutil or selection_bitsadmin or selection_curl or selection_wget' → True"
+      },
+      {
+        "test_id": "T1105-2",
+        "test_name": "BITSAdmin Download",
+        "expected": true,
+        "detected": true,
+        "correct": true,
+        "match_details": "Selections: {'selection_certutil': False, 'selection_bitsadmin': True, 'selection_curl': False, 'selection_wget': False} | Condition: 'selection_certutil or selection_bitsadmin or selection_curl or selection_wget' → True"
+      }
+    ]
+  },
+  "susp_lsass_access": {
+    "rule_name": "susp_lsass_access",
+    "rule_file": "rules/susp_lsass_access.yml",
+    "mitre_technique": "T1003.001",
+    "total_tests": 1,
+    "true_positives": 0,
+    "true_negatives": 0,
+    "false_positives": 0,
+    "false_negatives": 1,
+    "detection_score": 45.0,
+    "grade": "F",
+    "promotion_eligible": false,
+    "test_results": [
+      {
+        "test_id": "T1003.001-6",
+        "test_name": "Procdump LSASS dump",
+        "expected": true,
+        "detected": false,
+        "correct": false,
+        "match_details": "Selections: {'selection': False, 'filter_system': False} | Condition: 'selection and not filter_system' → False"
+      }
+    ]
+  },
+  "susp_scheduled_task_creation": {
+    "rule_name": "susp_scheduled_task_creation",
+    "rule_file": "rules/susp_scheduled_task_creation.yml",
+    "mitre_technique": "T1053.005",
+    "total_tests": 1,
+    "true_positives": 1,
+    "true_negatives": 0,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "detection_score": 100.0,
+    "grade": "A",
+    "promotion_eligible": true,
+    "test_results": [
+      {
+        "test_id": "T1053.005-1",
+        "test_name": "Scheduled Task via schtasks",
+        "expected": true,
+        "detected": true,
+        "correct": true,
+        "match_details": "Selections: {'selection': True, 'filter_system': False} | Condition: 'selection and not filter_system' → True"
+      }
+    ]
+  },
+  "susp_defender_disabled": {
+    "rule_name": "susp_defender_disabled",
+    "rule_file": "rules/susp_defender_disabled.yml",
+    "mitre_technique": "T1562.001",
+    "total_tests": 2,
+    "true_positives": 2,
+    "true_negatives": 0,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "detection_score": 100.0,
+    "grade": "A",
+    "promotion_eligible": true,
+    "test_results": [
+      {
+        "test_id": "T1562.001-1",
+        "test_name": "Disable Defender via PowerShell",
+        "expected": true,
+        "detected": true,
+        "correct": true,
+        "match_details": "Selections: {'selection_powershell': True, 'selection_reg': False, 'selection_sc': False} | Condition: 'selection_powershell or selection_reg or selection_sc' → True"
+      },
+      {
+        "test_id": "T1562.001-2",
+        "test_name": "Stop Defender service",
+        "expected": true,
+        "detected": true,
+        "correct": true,
+        "match_details": "Selections: {'selection_powershell': False, 'selection_reg': False, 'selection_sc': True} | Condition: 'selection_powershell or selection_reg or selection_sc' → True"
+      }
+    ]
+  }
+};
+
+        const ruleStates = {
+  "susp_cmd_whoami": { "stage": "dev", "score": 100.0, "grade": "A" },
+  "susp_powershell_execution": { "stage": "dev", "score": 100.0, "grade": "A" },
+  "susp_net_user_enum": { "stage": "dev", "score": 100.0, "grade": "A" },
+  "susp_registry_persistence": { "stage": "dev", "score": 45.0, "grade": "F" },
+  "susp_remote_file_download": { "stage": "dev", "score": 100.0, "grade": "A" },
+  "susp_lsass_access": { "stage": "dev", "score": 45.0, "grade": "F" },
+  "susp_scheduled_task_creation": { "stage": "dev", "score": 100.0, "grade": "A" },
+  "susp_defender_disabled": { "stage": "dev", "score": 100.0, "grade": "A" }
+};
+
+        const mitreMapping = [
+            { id: 'T1033', name: 'System Owner/User Discovery' },
+            { id: 'T1059.001', name: 'PowerShell Execution' },
+            { id: 'T1087.001', name: 'Local Account Discovery' },
+            { id: 'T1547.001', name: 'Registry Run Keys' },
+            { id: 'T1105', name: 'Ingress Tool Transfer' },
+            { id: 'T1003.001', name: 'LSASS Memory' },
+            { id: 'T1053.005', name: 'Scheduled Task' },
+            { id: 'T1562.001', name: 'Disable or Modify Tools' }
+        ];
+
+        // --- DASHBOARD LOGIC ---
+
+        function init() {
+            lucide.createIcons();
+            populateStats();
+            populateRules();
+            populateMitre();
+            renderChart();
+            
+            document.getElementById('close-modal').addEventListener('click', closeModal);
+            document.getElementById('modal-overlay').addEventListener('click', (e) => {
+                if(e.target === document.getElementById('modal-overlay')) closeModal();
+            });
+        }
+
+        function populateStats() {
+            const rules = Object.values(testReport);
+            document.getElementById('total-rules').textContent = rules.length;
+            
+            const avgScore = rules.reduce((acc, curr) => acc + curr.detection_score, 0) / rules.length;
+            document.getElementById('avg-score').textContent = Math.round(avgScore) + '%';
+            
+            const totalTests = rules.reduce((acc, curr) => acc + curr.total_tests, 0);
+            const successfulTests = rules.reduce((acc, curr) => acc + curr.true_positives + curr.true_negatives, 0);
+            const successRate = (successfulTests / totalTests) * 100;
+            document.getElementById('success-rate').textContent = Math.round(successRate) + '%';
+        }
+
+        function populateRules() {
+            const tbody = document.getElementById('rules-body');
+            tbody.innerHTML = '';
+
+            Object.keys(testReport).forEach(key => {
+                const report = testReport[key];
+                const state = ruleStates[key] || { stage: 'draft' };
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><span class="rule-name">${report.rule_name}</span></td>
+                    <td><span class="badge badge-stage" style="border-color: var(--text-dim); color: var(--text-dim)">${report.mitre_technique}</span></td>
+                    <td><span class="badge badge-${report.grade.toLowerCase()}">${report.grade}</span></td>
+                    <td>
+                        <div class="score-bar"><div class="score-fill" style="width: ${report.detection_score}%"></div></div>
+                        <span style="font-family: var(--font-mono); font-size: 0.8rem;">${report.detection_score}%</span>
+                    </td>
+                    <td><span class="badge badge-stage">${state.stage.toUpperCase()}</span></td>
+                    <td>
+                        <button class="expand-btn" onclick="showDetails('${key}')">Batafsil</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function populateMitre() {
+            const grid = document.getElementById('mitre-grid');
+            grid.innerHTML = '';
+
+            mitreMapping.forEach(tech => {
+                const cell = document.createElement('div');
+                cell.className = 'mitre-cell';
+                cell.innerHTML = `
+                    <div class="mitre-id">${tech.id}</div>
+                    <div class="mitre-name">${tech.name}</div>
+                `;
+                grid.appendChild(cell);
+            });
+        }
+
+        function renderChart() {
+            const grades = Object.values(testReport).map(r => r.grade);
+            const counts = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'F': 0 };
+            grades.forEach(g => counts[g] = (counts[g] || 0) + 1);
+
+            const ctx = document.getElementById('gradeChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['A (A'lo)', 'F (Qoniqarsiz)'],
+                    datasets: [{
+                        data: [counts['A'], counts['F']],
+                        backgroundColor: ['#00ff88', '#ff4d4d'],
+                        borderColor: '#12141c',
+                        borderWidth: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#e0e6ed', font: { family: 'Outfit' } }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        function showDetails(ruleKey) {
+            const report = testReport[ruleKey];
+            const overlay = document.getElementById('modal-overlay');
+            const container = document.getElementById('test-results-container');
+            
+            document.getElementById('modal-title').textContent = report.rule_name;
+            document.getElementById('modal-desc').textContent = `Texnik: ${report.mitre_technique} | Jami testlar: ${report.total_tests}`;
+            
+            container.innerHTML = '';
+            report.test_results.forEach(test => {
+                const item = document.createElement('div');
+                item.className = 'test-result-item';
+                item.innerHTML = `
+                    <div class="test-header">
+                        <span style="font-weight: 600;">[${test.test_id}] ${test.test_name}</span>
+                        <span class="test-status ${test.correct ? 'status-ok' : 'status-fail'}">
+                            ${test.correct ? 'MUVAFFAQIYAT' : 'XATO'}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-dim);">
+                        Natija: ${test.detected ? 'ANIQLANDI' : 'ANIQLANMADI'} | Kutilgan: ${test.expected ? 'ANIQLANISHI KERAK' : 'ANIQLANMASLIGI KERAK'}
+                    </div>
+                    <div class="test-details">${test.match_details}</div>
+                `;
+                container.appendChild(item);
+            });
+
+            overlay.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
