@@ -242,8 +242,4 @@ tags:
 
 ## 👨‍💻 Author
 
-**CyberBrother** — Kiberxavfsizlik bo'yicha detection engineering loyihasi.
-
----
-
-*Built with ❤️ for the security community*
+Khamidov Khusniddin for understanding  rules
